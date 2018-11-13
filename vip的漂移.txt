@@ -1,0 +1,72 @@
+使用3台虚拟机，2台作为Web服务器，并部署Keepalived、1台作为客户端
+步骤一：配置网络环境
+
+1）设置Web1服务器网络参数、配置Web服务
+nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.10/24 connection.autoconnect yes
+nmcli connection up eth0
+yum -y install httpd
+echo "192.168.4.10" > /var/www/html/index.html
+systemctl restart httpd
+2）设置Web2服务器网络参数、配置Web服务
+[root@web2 ~]# nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.20/24 connection.autoconnect yes
+nmcli connection up eth0
+yum -y install httpd
+echo "192.168.4.20" > /var/www/html/index.html
+systemctl restart httpd
+3）配置proxy主机的网络参数（我们也可以用真机当客户机)
+nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.5/24 connection.autoconnect yes
+nmcli connection up eth0
+步骤二：安装Keepalived软件
+
+注意：两台Web服务器做相同的操作。
+[root@web1 ~]# yum install -y keepalived
+[root@web2 ~]# yum install -y keepalived 
+步骤三：部署Keepalived服务
+
+1）修改web1服务器Keepalived配置文件
+
+router_id  web1     
+
+vrrp_instance VI_1 {
+  state MASTER                 
+  interface eth0               
+  virtual_router_id 51
+  priority 100                     
+  advert_int 1
+  authentication {
+    auth_type pass
+    auth_pass 1111       
+  }
+  virtual_ipaddress { 192.168.4.80  }    
+}
+
+2）修改web2服务器Keepalived配置文件
+
+router_id  web2
+
+vrrp_instance VI_1 {
+  state BACKUP
+  interface eth0    
+  virtual_router_id 51
+  priority 50
+  advert_int 1
+  authentication {
+    auth_type pass
+    auth_pass 1111  
+  } 
+  virtual_ipaddress { 192.168.4.80  }    
+}
+
+ 
+3）启动服务
+
+[root@web1 ~]# systemctl start keepalived
+[root@web2 ~]# systemctl start keepalived
+
+步骤四：测试
+
+登录两台Web服务器查看VIP信息
+[root@web1 ~]# ip addr show
+[root@web2 ~]# ip addr show
+
+
